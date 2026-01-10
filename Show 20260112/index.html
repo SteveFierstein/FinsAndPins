@@ -134,7 +134,7 @@
 <body>
 
 <h1>Welcome to the Click-to-Claim page of Fins and Pins</h1>
-<h2>[SHOW NAME GOES HERE]</h2>
+<h2 id="showTitle">Loading…</h2>
 
 <div id="globalCounts">Loading counts…</div>
 
@@ -147,10 +147,37 @@
 
 <script>
 // ------------------------------------------------------------
-// SHOW-SPECIFIC STORAGE (based on folder name)
+// AUTO-GENERATE SHOW NAME FROM FOLDER
 // ------------------------------------------------------------
-const pathParts = window.location.pathname.split("/").filter(Boolean);
-const showName = pathParts.length > 0 ? pathParts[0] : "default";
+(function() {
+    const pathParts = window.location.pathname.split("/").filter(Boolean);
+    const folder = pathParts[pathParts.length - 1] || "Show";
+
+    // Try to detect YYYYMMDD inside folder name
+    const dateMatch = folder.match(/(20\d{6})/);
+
+    let finalName = folder;
+
+    if (dateMatch) {
+        const raw = dateMatch[1]; // e.g., 20260112
+        const year = raw.substring(0, 4);
+        const month = raw.substring(4, 6);
+        const day = raw.substring(6, 8);
+
+        const dateObj = new Date(`${year}-${month}-${day}`);
+        const monthName = dateObj.toLocaleString("en-US", { month: "long" });
+
+        finalName = `${monthName} ${parseInt(day)} Show`;
+    }
+
+    document.getElementById("showTitle").textContent = finalName;
+})();
+
+// ------------------------------------------------------------
+// SHOW-SPECIFIC STORAGE
+// ------------------------------------------------------------
+const pathParts2 = window.location.pathname.split("/").filter(Boolean);
+const showName = pathParts2[pathParts2.length - 1] || "default";
 
 function loadSelections(boardName, type) {
     const key = `pinSelections-${showName}-${boardName}-${type}`;
