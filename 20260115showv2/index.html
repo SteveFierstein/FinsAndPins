@@ -147,31 +147,39 @@
 
 <script>
 // ------------------------------------------------------------
-// AUTO-GENERATE SHOW NAME FROM FOLDER
+// AUTO-GENERATE SHOW NAME FROM FOLDER (SAFE VERSION)
 // ------------------------------------------------------------
 (function() {
+    // Split the URL path and remove empty strings (fixes trailing slash issues)
     const pathParts = window.location.pathname.split("/").filter(Boolean);
-    const folder = pathParts[pathParts.length - 1] || "Show";
 
-    // Try to detect YYYYMMDD inside folder name
-    const dateMatch = folder.match(/(20\d{6})/);
+    // The last part is always the folder name
+    const folder = pathParts[pathParts.length - 1] || "Show";
 
     let finalName = folder;
 
+    // Try to detect an 8-digit date anywhere in the folder name
+    const dateMatch = folder.match(/20\d{6}/);
+
     if (dateMatch) {
-        const raw = dateMatch[1]; // e.g., 20260112
+        const raw = dateMatch[0]; // e.g., "20260115"
         const year = raw.substring(0, 4);
         const month = raw.substring(4, 6);
         const day = raw.substring(6, 8);
 
-        const dateObj = new Date(`${year}-${month}-${day}`);
-        const monthName = dateObj.toLocaleString("en-US", { month: "long" });
+        // Build a valid date object
+        const dateObj = new Date(`${year}-${month}-${day}T00:00:00`);
 
-        finalName = `${monthName} ${parseInt(day)} Show`;
+        if (!isNaN(dateObj)) {
+            const monthName = dateObj.toLocaleString("en-US", { month: "long" });
+            finalName = `${monthName} ${parseInt(day)} Show`;
+        }
     }
 
+    // Apply the final title to the page
     document.getElementById("showTitle").textContent = finalName;
 })();
+
 
 // ------------------------------------------------------------
 // SHOW-SPECIFIC STORAGE
