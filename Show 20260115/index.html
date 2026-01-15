@@ -240,6 +240,43 @@ modeToggleButton.addEventListener("click", () => {
 });
 
 // ------------------------------------------------------------
+// JSON VALIDATOR FOR ALL BOARD FILES
+// ------------------------------------------------------------
+async function validateAllJSONFiles(folderName, boardList) {
+    const errors = [];
+
+    for (const board of boardList) {
+        const jsonPath = `${folderName}/boards/${board}.json`;
+
+        try {
+            const response = await fetch(jsonPath);
+
+            if (!response.ok) {
+                errors.push(`${board}.json → HTTP ${response.status}`);
+                continue;
+            }
+
+            const text = await response.text();
+
+            try {
+                JSON.parse(text);
+            } catch (parseErr) {
+                errors.push(`${board}.json → JSON parse error: ${parseErr.message}`);
+            }
+
+        } catch (err) {
+            errors.push(`${board}.json → Fetch error: ${err.message}`);
+        }
+    }
+
+    if (errors.length === 0) {
+        alert("All JSON files are valid.");
+    } else {
+        alert("JSON ERRORS FOUND:\n\n" + errors.join("\n"));
+    }
+}
+
+// ------------------------------------------------------------
 // LOAD MANIFEST AND BUILD BOARDS
 // ------------------------------------------------------------
 fetch("./boards/manifest.json")
