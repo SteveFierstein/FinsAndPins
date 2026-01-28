@@ -238,116 +238,117 @@ modeToggleButton.addEventListener("click", () => {
 });
 
 // ------------------------------------------------------------
-// LOAD MANIFEST AND BUILD BOARDS
+// LOAD MANIFEST AND BUILD BOARDS (PROMISE-BASED)
 // ------------------------------------------------------------
 fetch("./boards/manifest.json")
     .then(r => r.json())
     .then(boardList => {
-        boardList.forEach(boardName => {
-            createBoard(boardName);
-        });
-
+        return Promise.all(boardList.map(createBoard));
+    })
+    .then(() => {
         footerControls.style.display = "flex";
         updateGlobalCounts();
-        loadClaims();   // Firebase claims after boards exist
+        loadClaims();   // Now safe — all boards exist
     });
 
 function createBoard(boardName) {
-    const container = document.createElement("div");
-    container.className = "board-container";
+    return new Promise(resolve => {
+        const container = document.createElement("div");
+        container.className = "board-container";
 
-    const title = document.createElement("div");
-    title.className = "board-title";
-    title.textContent = boardName;
-    container.appendChild(title);
+        const title = document.createElement("div");
+        title.className = "board-title";
+        title.textContent = boardName;
+        container.appendChild(title);
 
-    const countDiv = document.createElement("div");
-    countDiv.className = "board-count";
-    countDiv.id = `count-${boardName}`;
-    countDiv.textContent = "Pins: 0 — Claimed: 0 — Pulled: 0";
-    container.appendChild(countDiv);
+        const countDiv = document.createElement("div");
+        countDiv.className = "board-count";
+        countDiv.id = `count-${boardName}`;
+        countDiv.textContent = "Pins: 0 — Claimed: 0 — Pulled: 0";
+        container.appendChild(countDiv);
 
-    const wrapper = document.createElement("div");
-    wrapper.className = "board-wrapper";
+        const wrapper = document.createElement("div");
+        wrapper.className = "board-wrapper";
 
-    const img = document.createElement("img");
-    img.className = "board-img";
-    img.loading = "lazy";
-    img.src = `./boards/${boardName}.jpeg`;
+        const img = document.createElement("img");
+        img.className = "board-img";
+        img.loading = "lazy";
+        img.src = `./boards/${boardName}.jpeg`;
 
-    wrapper.appendChild(img);
-    container.appendChild(wrapper);
-    document.body.insertBefore(container, footerControls);
+        wrapper.appendChild(img);
+        container.appendChild(wrapper);
+        document.body.insertBefore(container, footerControls);
 
-    boardsState[boardName] = {
-        totalPins: 0,
-        claimed: [],
-        pulled: [],
-        countDiv: countDiv
-    };
+        boardsState[boardName] = {
+            totalPins: 0,
+            claimed: [],
+            pulled: [],
+            countDiv: countDiv
+        };
 
-    fetch(`./boards/${boardName}.json`)
-        .then(r => r.json())
-        .then(data => {
-            const pins = data.output?.predictions || [];
-            const totalPins = pins.length;
+        fetch(`./boards/${boardName}.json`)
+            .then(r => r.json())
+            .then(data => {
+                const pins = data.output?.predictions || [];
+                const totalPins = pins.length;
 
-            boardsState[boardName].totalPins = totalPins;
-            globalTotals.totalPins += totalPins;
+                boardsState[boardName].totalPins = totalPins;
+                globalTotals.totalPins += totalPins;
 
-            // claimed now comes from Firebase; keep localStorage only for pulled
-            let claimedSelections = []; 
-            let pulledSelections = loadSelections(boardName, "pulled");
-            boardsState[boardName].claimed = claimedSelections.slice();
-            boardsState[boardName].pulled = pulledSelections.slice();
+                let claimedSelections = []; 
+                let pulledSelections = loadSelections(boardName, "pulled");
+                boardsState[boardName].claimed = claimedSelections.slice();
+                boardsState[boardName].pulled = pulledSelections.slice();
 
-            updateBoardCount(boardName);
+                updateBoardCount(boardName);
 
-            img.onload = () => {
-                const ORIGINAL_WIDTH = img.naturalWidth;
-                const displayedWidth = img.clientWidth;
-                const scale = displayedWidth / ORIGINAL_WIDTH;
+                img.onload = () => {
+                    const ORIGINAL_WIDTH = img.naturalWidth;
+                    const displayedWidth = img.clientWidth;
+                    const scale = displayedWidth / ORIGINAL_WIDTH;
 
-                pins.forEach((pin, index) => {
-                    const div = document.createElement("div");
-                    div.className = "pin";
-                    div.dataset.board = boardName;
-                    div.dataset.pin = index;
+                    pins.forEach((pin, index) => {
+                        const div = document.createElement("div");
+                        div.className = "pin";
+                        div.dataset.board = boardName;
+                        div.dataset.pin = index;
 
-                    const left = (pin.x - pin.width / 2) * scale;
-                    const top = (pin.y - pin.height / 2) * scale;
-                    const width = pin.width * scale;
-                    const height = pin.height * scale;
+                        const left = (pin.x - pin.width / 2) * scale;
+                        const top = (pin.y - pin.height / 2) * scale;
+                        const width = pin.width * scale;
+                        const height = pin.height * scale;
 
-                    div.style.left = left + "px";
-                    div.style.top = top + "px";
-                    div.style.width = width + "px";
-                    div.style.height = height + "px";
+                        div.style.left = left + "px";
+                        div.style.top = top + "px";
+                        div.style.width = width + "px";
+                        div.style.height = height + "px";
 
-                    div.style.fontSize = (height * 0.6) + "px";
+                        div.style.fontSize = (height * 0.6) + "px";
 
-                    const check = document.createElement("span");
-                    check.className = "checkmark";
-                    check.textContent = "✓";
-                    div.appendChild(check);
+                        const check = document.createElement("span");
+                        check.className = "checkmark";
+                        check.textContent = "✓";
+                        div.appendChild(check);
 
-                    if (claimedSelections.includes(index)) {
-                        div.classList.add("claimed");
-                    }
-                    if (pulledSelections.includes(index)) {
-                        div.classList.add("pulled");
-                    }
+                        if (claimedSelections.includes(index)) {
+                            div.classList.add("claimed");
+                        }
+                        if (pulledSelections.includes(index)) {
+                            div.classList.add("pulled");
+                        }
 
-                    div.addEventListener("click", () => {
-                        handlePinClick(boardName, index, div);
+                        div.addEventListener("click", () => {
+                            handlePinClick(boardName, index, div);
+                        });
+
+                        wrapper.appendChild(div);
                     });
 
-                    wrapper.appendChild(div);
-                });
-
-                updateGlobalCounts();
-            };
-        });
+                    updateGlobalCounts();
+                    resolve();   // ⭐ Board fully loaded
+                };
+            });
+    });
 }
 
 // ------------------------------------------------------------
@@ -369,8 +370,6 @@ function handlePinClick(boardName, pinIndex, pinDiv) {
             state.claimed = state.claimed.filter(i => i !== pinIndex);
             unclaimPin(`${boardName}-${pinIndex}`);
         }
-
-        // no localStorage for claimed; Firebase is source of truth
 
     } else {
         const isPulled = pinDiv.classList.toggle("pulled");
@@ -458,12 +457,10 @@ function loadClaims() {
     db.ref(`claims/${showName}`).on("value", snapshot => {
         const claims = snapshot.val() || {};
 
-        // reset claimed arrays
         Object.keys(boardsState).forEach(boardName => {
             boardsState[boardName].claimed = [];
         });
 
-        // apply claims from Firebase
         Object.keys(claims).forEach(pinId => {
             const [boardName, indexStr] = pinId.split("-");
             const pinIndex = parseInt(indexStr, 10);
@@ -482,6 +479,8 @@ function loadClaims() {
             if (pinDiv) {
                 pinDiv.classList.add("claimed");
             }
+
+            updateBoardCount(boardName);   // ⭐ FIXED
         });
 
         updateGlobalCounts();
