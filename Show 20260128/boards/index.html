@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Fins and Pins - Click to Claim (Version 2.1)</title>
+<title>Fins and Pins - Click to Claim (Version 2.2)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -153,13 +153,11 @@
     const pathParts = window.location.pathname.split("/").filter(Boolean);
     const folder = pathParts[pathParts.length - 1] || "Show";
 
-    // Try to detect YYYYMMDD inside folder name
     const dateMatch = folder.match(/(20\d{6})/);
-
     let finalName = folder;
 
     if (dateMatch) {
-        const raw = dateMatch[1]; // e.g., 20260112
+        const raw = dateMatch[1];
         const year = raw.substring(0, 4);
         const month = raw.substring(4, 6);
         const day = raw.substring(6, 8);
@@ -251,6 +249,7 @@ fetch("./boards/manifest.json")
 
         footerControls.style.display = "flex";
         updateGlobalCounts();
+        loadClaims();   // 🔥 NEW: Load Firebase claims after boards exist
     });
 
 function createBoard(boardName) {
@@ -311,6 +310,8 @@ function createBoard(boardName) {
                 pins.forEach((pin, index) => {
                     const div = document.createElement("div");
                     div.className = "pin";
+                    div.dataset.board = boardName;
+                    div.dataset.pin = index;
 
                     const left = (pin.x - pin.width / 2) * scale;
                     const top = (pin.y - pin.height / 2) * scale;
@@ -357,14 +358,19 @@ function handlePinClick(boardName, pinIndex, pinDiv) {
 
     if (currentMode === "claim") {
         const isClaimed = pinDiv.classList.toggle("claimed");
+
         if (isClaimed) {
             if (!state.claimed.includes(pinIndex)) {
                 state.claimed.push(pinIndex);
             }
+            claimPin(`${boardName}-${pinIndex}`);   // 🔥 NEW
         } else {
             state.claimed = state.claimed.filter(i => i !== pinIndex);
+            unclaimPin(`${boardName}-${pinIndex}`); // 🔥 NEW
         }
+
         saveSelections(boardName, "claimed", state.claimed);
+
     } else {
         const isPulled = pinDiv.classList.toggle("pulled");
         if (isPulled) {
@@ -411,11 +417,15 @@ function updateGlobalCounts() {
         `Total Pins: ${globalTotals.totalPins} — Claimed: ${claimed} — Pulled: ${pulled}`;
 }
 </script>
+
+<!-- ------------------------------------------------------------
+     FIREBASE
+------------------------------------------------------------- -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
 <script>
-  const firebaseConfig = {
+const firebaseConfig = {
     apiKey: "AIzaSyB5HoTCon9uIFJqnF506tB_jORAG1HvI7o",
     authDomain: "fins-and-pins-click-to-claim.firebaseapp.com",
     databaseURL: "https://fins-and-pins-click-to-claim-default-rtdb.firebaseio.com",
@@ -424,10 +434,56 @@ function updateGlobalCounts() {
     messagingSenderId: "31512845258",
     appId: "1:31512845258:web:2124fae24cfee229084d33",
     measurementId: "G-JRP1Y4TL0W"
-  };
+};
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ------------------------------------------------------------
+// FIREBASE CLAIM SYNC
+// ------------------------------------------------------------
+function claimPin(pinId) {
+    db.ref(`claims/${pinId}`).set({
+        claimed: true,
+        timestamp: Date.now()
+    });
+}
+
+function unclaimPin(pinId) {
+    db.ref(`claims/${pinId}`).remove();
+}
+
+function loadClaims() {
+    db.ref("claims").on("value", snapshot => {
+        const claims = snapshot.val() || {};
+
+        Object.keys(boardsState).forEach(boardName => {
+            boardsState[boardName].claimed = [];
+        });
+
+        Object.keys(claims).forEach(pinId => {
+            const [boardName, indexStr] = pinId.split("-");
+            const pinIndex = parseInt(indexStr, 10);
+
+            const state = boardsState[boardName];
+            if (!state) return;
+
+            if (!state.claimed.includes(pinIndex)) {
+                state.claimed.push(pinIndex);
+            }
+
+            const pinDiv = document.querySelector(
+                `[data-board="${boardName}"][data-pin="${pinIndex}"]`
+            );
+
+            if (pinDiv) {
+                pinDiv.classList.add("claimed");
+            }
+        });
+
+        updateGlobalCounts();
+    });
+}
 </script>
 
 </body>
