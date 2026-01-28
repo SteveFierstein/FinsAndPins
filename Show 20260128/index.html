@@ -249,7 +249,7 @@ fetch("./boards/manifest.json")
 
         footerControls.style.display = "flex";
         updateGlobalCounts();
-        loadClaims();   // 🔥 NEW: Load Firebase claims after boards exist
+        loadClaims();   // Firebase claims after boards exist
     });
 
 function createBoard(boardName) {
@@ -295,7 +295,8 @@ function createBoard(boardName) {
             boardsState[boardName].totalPins = totalPins;
             globalTotals.totalPins += totalPins;
 
-            let claimedSelections = loadSelections(boardName, "claimed");
+            // claimed now comes from Firebase; keep localStorage only for pulled
+            let claimedSelections = []; 
             let pulledSelections = loadSelections(boardName, "pulled");
             boardsState[boardName].claimed = claimedSelections.slice();
             boardsState[boardName].pulled = pulledSelections.slice();
@@ -363,13 +364,13 @@ function handlePinClick(boardName, pinIndex, pinDiv) {
             if (!state.claimed.includes(pinIndex)) {
                 state.claimed.push(pinIndex);
             }
-            claimPin(`${boardName}-${pinIndex}`);   // 🔥 NEW
+            claimPin(`${boardName}-${pinIndex}`);
         } else {
             state.claimed = state.claimed.filter(i => i !== pinIndex);
-            unclaimPin(`${boardName}-${pinIndex}`); // 🔥 NEW
+            unclaimPin(`${boardName}-${pinIndex}`);
         }
 
-        saveSelections(boardName, "claimed", state.claimed);
+        // no localStorage for claimed; Firebase is source of truth
 
     } else {
         const isPulled = pinDiv.classList.toggle("pulled");
@@ -440,27 +441,29 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // ------------------------------------------------------------
-// FIREBASE CLAIM SYNC
+// FIREBASE CLAIM SYNC (NAMESPACED BY SHOW)
 // ------------------------------------------------------------
 function claimPin(pinId) {
-    db.ref(`claims/${pinId}`).set({
+    db.ref(`claims/${showName}/${pinId}`).set({
         claimed: true,
         timestamp: Date.now()
     });
 }
 
 function unclaimPin(pinId) {
-    db.ref(`claims/${pinId}`).remove();
+    db.ref(`claims/${showName}/${pinId}`).remove();
 }
 
 function loadClaims() {
-    db.ref("claims").on("value", snapshot => {
+    db.ref(`claims/${showName}`).on("value", snapshot => {
         const claims = snapshot.val() || {};
 
+        // reset claimed arrays
         Object.keys(boardsState).forEach(boardName => {
             boardsState[boardName].claimed = [];
         });
 
+        // apply claims from Firebase
         Object.keys(claims).forEach(pinId => {
             const [boardName, indexStr] = pinId.split("-");
             const pinIndex = parseInt(indexStr, 10);
